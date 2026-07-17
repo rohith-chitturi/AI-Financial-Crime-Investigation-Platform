@@ -6,5 +6,7 @@ from app.db.models.account import Account
 from app.db.models.merchant import Merchant
 from app.db.models.organization import Organization
 from app.db.models.transaction import Transaction
+from app.db.models.alert import Alert
+from app.db.models.risk_analysis import TransactionRiskAnalysis
 
-__all__ = ["Base", "Role", "User", "Customer", "Account", "Merchant", "Organization", "Transaction"]
+__all__ = ["Base", "Role", "User", "Customer", "Account", "Merchant", "Organization", "Transaction", "Alert", "TransactionRiskAnalysis"]
