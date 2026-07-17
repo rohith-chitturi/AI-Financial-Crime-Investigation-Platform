@@ -27,6 +27,14 @@ class Settings(BaseSettings):
 
     GOOGLE_API_KEY: Optional[str] = None
     GEMINI_MODEL: str = "gemini-1.5-pro"
+    
+    # Risk Scoring Weights
+    RISK_WEIGHT_ML: float = 0.40
+    RISK_WEIGHT_AML_RULES: float = 0.40
+    RISK_WEIGHT_CUSTOMER: float = 0.20
+    
+    # Alert Threshold
+    ALERT_THRESHOLD: float = 75.0
 
     class Config:
         case_sensitive = True
