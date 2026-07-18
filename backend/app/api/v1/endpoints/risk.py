@@ -11,19 +11,23 @@ from app.db.models.risk_analysis import TransactionRiskAnalysis
 from app.schemas.risk import TransactionRiskAnalysisResponse
 from app.services.risk_scoring import RiskScoringService
 
+from app.db.neo4j_database import get_neo4j_session
+from neo4j import AsyncSession as Neo4jAsyncSession
+
 router = APIRouter()
 
 @router.post("/analyze/{transaction_id}", response_model=TransactionRiskAnalysisResponse)
 async def analyze_transaction(
     transaction_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
+    neo4j_session: Neo4jAsyncSession = Depends(get_neo4j_session),
     current_user: User = Depends(get_current_active_user)
 ) -> Any:
     """
     Manually triggers the risk engine for a given transaction.
     """
     try:
-        analysis = await RiskScoringService.analyze_transaction(db, str(transaction_id))
+        analysis = await RiskScoringService.analyze_transaction(db, neo4j_session, str(transaction_id))
         return analysis
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
