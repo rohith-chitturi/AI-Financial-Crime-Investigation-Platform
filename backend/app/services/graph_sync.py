@@ -65,10 +65,6 @@ class GraphSyncService:
         WITH n, a
         MATCH (c:Customer {id: a.customer_id})
         MERGE (c)-[:OWNS]->(n)
-        WITH n, a
-        WHERE a.organization_id IS NOT NULL
-        MATCH (o:Organization {id: a.organization_id})
-        MERGE (n)-[:ASSOCIATED_WITH]->(o)
         """
         account_data = [{
             "id": str(a.id), 
@@ -76,8 +72,7 @@ class GraphSyncService:
             "account_type": a.account_type, 
             "balance": float(a.balance), 
             "currency": a.currency,
-            "customer_id": str(a.customer_id),
-            "organization_id": str(a.organization_id) if a.organization_id else None
+            "customer_id": str(a.customer_id)
         } for a in accounts]
         
         if account_data:
@@ -93,9 +88,9 @@ class GraphSyncService:
         UNWIND $organizations AS o
         MERGE (n:Organization {id: o.id})
         SET n.name = o.name,
-            n.registration_country = o.registration_country
+            n.country = o.country
         """
-        org_data = [{"id": str(o.id), "name": o.name, "registration_country": o.registration_country} for o in organizations]
+        org_data = [{"id": str(o.id), "name": o.name, "country": o.country} for o in organizations]
         
         if org_data:
             await neo4j_session.run(cypher, organizations=org_data)
@@ -110,10 +105,10 @@ class GraphSyncService:
         UNWIND $merchants AS m
         MERGE (n:Merchant {id: m.id})
         SET n.name = m.name,
-            n.category_code = m.category_code,
+            n.category = m.category,
             n.country = m.country
         """
-        merchant_data = [{"id": str(m.id), "name": m.name, "category_code": m.category_code, "country": m.country} for m in merchants]
+        merchant_data = [{"id": str(m.id), "name": m.name, "category": m.category, "country": m.country} for m in merchants]
         
         if merchant_data:
             await neo4j_session.run(cypher, merchants=merchant_data)
@@ -149,13 +144,26 @@ class GraphSyncService:
             rel.status = t.status
         """
         
-        # Withdrawals / Deposits (No explicit destination/merchant in graph, maybe link to a generic external node, 
-        # but for now we skip or create generic nodes. Let's just track transfers and merchant payments for typologies)
+        # Organization transactions
+        org_cypher = """
+        UNWIND $transactions AS t
+        MATCH (src:Account {id: t.source_account_id})
+        MATCH (o:Organization {id: t.organization_id})
+        MERGE (src)-[rel:ASSOCIATED_WITH {id: t.id}]->(o)
+        SET rel.amount = t.amount,
+            rel.currency = t.currency,
+            rel.timestamp = t.timestamp,
+            rel.status = t.status
+        """
         
         transfers = []
         merchant_payments = []
+        org_payments = []
         
         for t in transactions:
+            if not t.source_account_id:
+                continue
+                
             data = {
                 "id": str(t.id),
                 "source_account_id": str(t.source_account_id),
@@ -170,13 +178,18 @@ class GraphSyncService:
             elif t.merchant_id:
                 data["merchant_id"] = str(t.merchant_id)
                 merchant_payments.append(data)
+            elif t.organization_id:
+                data["organization_id"] = str(t.organization_id)
+                org_payments.append(data)
                 
         if transfers:
             await neo4j_session.run(transfer_cypher, transactions=transfers)
         if merchant_payments:
             await neo4j_session.run(merchant_cypher, transactions=merchant_payments)
+        if org_payments:
+            await neo4j_session.run(org_cypher, transactions=org_payments)
             
-        logger.info(f"Synced {len(transfers)} transfers and {len(merchant_payments)} merchant payments to Neo4j.")
+        logger.info(f"Synced {len(transfers)} transfers, {len(merchant_payments)} merchant payments, and {len(org_payments)} organization txs to Neo4j.")
 
     @classmethod
     async def full_sync(cls, db: AsyncSession, neo4j_session: Neo4jAsyncSession):

@@ -6,7 +6,7 @@ import os
 # Add the backend directory to sys.path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from app.db.database import SessionLocal
+from app.db.database import AsyncSessionLocal
 from app.db.neo4j_database import neo4j_db
 from app.services.graph_sync import GraphSyncService
 
@@ -24,7 +24,7 @@ async def main():
     logger.info("Starting graph synchronization from PostgreSQL...")
     
     try:
-        async with SessionLocal() as db_session:
+        async with AsyncSessionLocal() as db_session:
             async with neo4j_db.driver.session() as neo4j_session:
                 await GraphSyncService.full_sync(db_session, neo4j_session)
                 
