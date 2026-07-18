@@ -17,7 +17,11 @@ class TransactionRiskAnalysis(Base):
     ml_score = Column(Float, nullable=False) # 0 to 100
     aml_rule_score = Column(Float, nullable=False) # 0 to 100
     customer_risk_score = Column(Float, nullable=False) # 0 to 100
+    graph_score = Column(Float, nullable=True) # 0 to 100
     unified_risk_score = Column(Float, nullable=False) # 0 to 100
+    
+    graph_evidence = Column(JSONB, default=list) # List of string explanations
+    graph_version = Column(String, nullable=True)
     
     risk_level = Column(String, nullable=False) # 'Low', 'Medium', 'High', 'Critical'
     
