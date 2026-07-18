@@ -79,7 +79,13 @@ This platform is built using a modern, scalable, and modular tech stack to ensur
    python scripts/generate_data.py
    ```
 
-7. **Run the Application:**
+7. **Synchronize Graph Database:**
+   Push the generated SQL data into Neo4j for Knowledge Graph analysis.
+   ```bash
+   python scripts/sync_to_neo4j.py
+   ```
+
+8. **Run the Application:**
    ```bash
    uvicorn app.main:app --reload
    ```

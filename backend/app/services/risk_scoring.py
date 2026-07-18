@@ -15,7 +15,7 @@ from app.core.config import settings
 class RiskScoringService:
     
     @staticmethod
-    async def analyze_transaction(db: AsyncSession, transaction_id: str) -> TransactionRiskAnalysis:
+    async def analyze_transaction(db: AsyncSession, neo4j_session: Any, transaction_id: str) -> TransactionRiskAnalysis:
         start_time = time.time()
         
         # 1. Fetch Transaction
@@ -34,13 +34,25 @@ class RiskScoringService:
         # 4. AML Rule Engine
         aml_score, triggered_rules = await AMLRuleEngine.evaluate_transaction(db, transaction, features)
         
-        # 5. Customer Risk
+        # 5. Knowledge Graph Risk Analysis
+        from app.services.graph_analysis import GraphAnalysisService
+        graph_risk_data = await GraphAnalysisService.analyze_transaction_risk(
+            neo4j_session, 
+            str(transaction.source_account_id), 
+            str(transaction.destination_account_id) if transaction.destination_account_id else None
+        )
+        graph_score = graph_risk_data["graph_score"]
+        graph_evidence = graph_risk_data["graph_evidence"]
+        graph_version = graph_risk_data["graph_version"]
+        
+        # 6. Customer Risk
         customer_score = features.get("customer_base_risk", 0.5) * 100.0
         
-        # 6. Unified Risk Scoring
+        # 7. Unified Risk Scoring
         unified_score = (
             (ml_score * settings.RISK_WEIGHT_ML) +
             (aml_score * settings.RISK_WEIGHT_AML_RULES) +
+            (graph_score * settings.RISK_WEIGHT_GRAPH) +
             (customer_score * settings.RISK_WEIGHT_CUSTOMER)
         )
         
@@ -54,16 +66,17 @@ class RiskScoringService:
         else:
             risk_level = "Low"
             
-        # 7. Generate Explainability
+        # 8. Generate Explainability
         explanation = RiskScoringService._generate_explanation(
             ml_score, ml_explanations,
             aml_score, triggered_rules,
+            graph_score, graph_evidence,
             customer_score
         )
         
         processing_time_ms = int((time.time() - start_time) * 1000)
         
-        # 8. Persist Risk Analysis
+        # 9. Persist Risk Analysis
         # Check if analysis already exists (idempotency)
         existing_analysis_query = await db.execute(
             select(TransactionRiskAnalysis).where(TransactionRiskAnalysis.transaction_id == transaction_id)
@@ -75,10 +88,13 @@ class RiskScoringService:
             analysis = existing_analysis
             analysis.ml_score = ml_score
             analysis.aml_rule_score = aml_score
+            analysis.graph_score = graph_score
             analysis.customer_risk_score = customer_score
             analysis.unified_risk_score = unified_score
             analysis.risk_level = risk_level
             analysis.triggered_rules = triggered_rules
+            analysis.graph_evidence = graph_evidence
+            analysis.graph_version = graph_version
             analysis.explanation = explanation
             analysis.model_version = MODEL_VERSION
             analysis.processing_time_ms = processing_time_ms
@@ -88,10 +104,13 @@ class RiskScoringService:
                 model_version=MODEL_VERSION,
                 ml_score=ml_score,
                 aml_rule_score=aml_score,
+                graph_score=graph_score,
                 customer_risk_score=customer_score,
                 unified_risk_score=unified_score,
                 risk_level=risk_level,
                 triggered_rules=triggered_rules,
+                graph_evidence=graph_evidence,
+                graph_version=graph_version,
                 explanation=explanation,
                 processing_time_ms=processing_time_ms
             )
@@ -100,7 +119,7 @@ class RiskScoringService:
         await db.commit()
         await db.refresh(analysis)
         
-        # 9. Create Alert if threshold met
+        # 10. Create Alert if threshold met
         if unified_score >= settings.ALERT_THRESHOLD:
             await RiskScoringService._create_or_update_alert(db, transaction, analysis)
             
@@ -109,6 +128,7 @@ class RiskScoringService:
     @staticmethod
     def _generate_explanation(ml_score: float, ml_explanations: list,
                               aml_score: float, triggered_rules: list,
+                              graph_score: float, graph_evidence: list,
                               customer_score: float) -> str:
         parts = []
         
@@ -121,6 +141,11 @@ class RiskScoringService:
             parts.append(f"\n**Deterministic AML Rules (Score: {aml_score:.1f}/100):**")
             for rule in triggered_rules:
                 parts.append(f"- [{rule['rule_id']}] {rule['rule_name']}: {rule['description']}")
+                
+        if graph_evidence:
+            parts.append(f"\n**Knowledge Graph Network (Score: {graph_score:.1f}/100):**")
+            for ev in graph_evidence:
+                parts.append(f"- {ev}")
                 
         if customer_score > 50:
             parts.append(f"\n**Customer Risk Factors (Score: {customer_score:.1f}/100):**")

@@ -17,9 +17,12 @@ class TransactionRiskAnalysisResponse(BaseModel):
     ml_score: float
     aml_rule_score: float
     customer_risk_score: float
+    graph_score: Optional[float] = None
     unified_risk_score: float
     risk_level: str
     triggered_rules: List[Dict[str, Any]]
+    graph_evidence: Optional[List[str]] = None
+    graph_version: Optional[str] = None
     explanation: str
     processing_time_ms: Optional[int]
     analysis_timestamp: datetime
