@@ -29,9 +29,10 @@ class Settings(BaseSettings):
     GEMINI_MODEL: str = "gemini-1.5-pro"
     
     # Risk Scoring Weights
-    RISK_WEIGHT_ML: float = 0.40
-    RISK_WEIGHT_AML_RULES: float = 0.40
-    RISK_WEIGHT_CUSTOMER: float = 0.20
+    RISK_WEIGHT_ML: float = 0.30
+    RISK_WEIGHT_AML_RULES: float = 0.30
+    RISK_WEIGHT_GRAPH: float = 0.30
+    RISK_WEIGHT_CUSTOMER: float = 0.10
     
     # Alert Threshold
     ALERT_THRESHOLD: float = 75.0
