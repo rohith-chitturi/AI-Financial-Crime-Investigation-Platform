@@ -15,7 +15,7 @@ from app.core.config import settings
 class RiskScoringService:
     
     @staticmethod
-    async def analyze_transaction(db: AsyncSession, neo4j_session: Any, transaction_id: str) -> TransactionRiskAnalysis:
+    async def analyze_transaction(db: AsyncSession, neo4j_session: Any, transaction_id: str, background_tasks=None) -> TransactionRiskAnalysis:
         start_time = time.time()
         
         # 1. Fetch Transaction
@@ -119,9 +119,12 @@ class RiskScoringService:
         await db.commit()
         await db.refresh(analysis)
         
-        # 10. Create Alert if threshold met
+        # 10. Create Alert and Auto-Investigation if threshold met
         if unified_score >= settings.ALERT_THRESHOLD:
             await RiskScoringService._create_or_update_alert(db, transaction, analysis)
+            if background_tasks:
+                from app.api.v1.endpoints.investigations import run_investigation_task
+                background_tasks.add_task(run_investigation_task, transaction.id, "AUTO")
             
         return analysis
 

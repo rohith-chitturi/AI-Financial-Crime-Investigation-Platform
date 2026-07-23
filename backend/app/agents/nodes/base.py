@@ -38,6 +38,8 @@ class BaseNode:
         state["processing_log"].append(execution_record)
         
         if error:
+            import traceback
+            traceback.print_exc()
             if "errors" not in state or state["errors"] is None:
                 state["errors"] = []
             state["errors"].append({"agent": self.node_name, "error": error})

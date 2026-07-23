@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 
-from app.api.v1.endpoints import auth, health, customers, accounts, transactions, risk, alerts, graph
+from app.api.v1.endpoints import auth, health, customers, accounts, transactions, risk, alerts, graph, investigations
 
 api_router = APIRouter()
 
@@ -12,4 +12,5 @@ api_router.include_router(transactions.router, prefix="/transactions", tags=["tr
 api_router.include_router(risk.router, prefix="/risk", tags=["risk engine"])
 api_router.include_router(alerts.router, prefix="/alerts", tags=["alerts"])
 api_router.include_router(graph.router, prefix="/graph", tags=["knowledge graph"])
+api_router.include_router(investigations.router, prefix="/investigations", tags=["investigations"])
 
