@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from typing import Any
@@ -19,6 +19,7 @@ router = APIRouter()
 @router.post("/analyze/{transaction_id}", response_model=TransactionRiskAnalysisResponse)
 async def analyze_transaction(
     transaction_id: uuid.UUID,
+    background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
     neo4j_session: Neo4jAsyncSession = Depends(get_neo4j_session),
     current_user: User = Depends(get_current_active_user)
@@ -27,7 +28,7 @@ async def analyze_transaction(
     Manually triggers the risk engine for a given transaction.
     """
     try:
-        analysis = await RiskScoringService.analyze_transaction(db, neo4j_session, str(transaction_id))
+        analysis = await RiskScoringService.analyze_transaction(db, neo4j_session, str(transaction_id), background_tasks)
         return analysis
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
